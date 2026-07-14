@@ -1,4 +1,4 @@
-# Asymmetric Inversion (Temporary Title) 🪨📄✂️
+# Asymmetric Inversion (Temporary Title)
 
 An asymmetric binary puzzle game built in C# and targeting Unity. The mechanics revolve around a custom-shaped grid where players interact with nodes under strict state rules.
 
