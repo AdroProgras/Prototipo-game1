@@ -1,68 +1,109 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 class Program
 {
     static void Main(string[] args)
     {
-        TableroLogica juego = new TableroLogica();
-        
-        // SE AGREGÓ: Selector de dificultad al arrancar el programa
-        Console.Clear();
-        Console.WriteLine("=== SELECCIONÁ LA DIFICULTAD ===");
-        Console.WriteLine("1. Modo Fácil (Solo movimientos horizontales)");
-        Console.WriteLine("2. Modo Difícil (Movimientos horizontales y verticales por zonas)");
-        Console.Write("Opción (1 o 2): ");
-        
-        string opcion = Console.ReadLine().Trim();
-        bool modoDificil = (opcion == "2");
-
         while (true)
         {
+            TableroLogica juego = new TableroLogica();
+            
             Console.Clear();
-            Console.WriteLine("=== PROTOTIPO: INVERSIÓN ASIMÉTRICA ===");
-            Console.WriteLine($"Modo actual: {(modoDificil ? "DIFÍCIL 🔴" : "FÁCIL 🟢")}");
-            Console.WriteLine("Estados: 0 = BLANCO, 1 = NEGRO (Solo podés tocar los 1s)\n");
+            Console.WriteLine("=== PROTOTIPO: MOTOR GENERADOR BFS ===");
+            Console.WriteLine("1. Modo Fácil (Solo movimientos horizontales)");
+            Console.WriteLine("2. Modo Difícil (Movimientos horizontales y verticales por zonas)");
+            Console.Write("Opción (1 o 2) o 'salir': ");
+            
+            string opcion = Console.ReadLine().Trim();
+            if (opcion.ToLower() == "salir") break;
+            bool modoDificil = (opcion == "2");
 
-            juego.DibujarTableroConsola();
+            Console.WriteLine("\n[CONFIGURACIÓN DE DIFICULTAD INTERACTIVA]");
+            List<int> configuracionToques = new List<int>();
 
-            Console.WriteLine("\nEscribí la fila (A-F) y el botón (1-6) separados por espacio.");
-            Console.WriteLine("Ejemplo: B 3 (Escribí 'salir' para terminar)");
-            Console.Write("Tu jugada: ");
-
-            string entrada = Console.ReadLine().Trim().ToUpper();
-            if (entrada == "SALIR") break;
-
-            string[] partes = entrada.Split(' ');
-            if (partes.Length == 2)
+            if (!modoDificil)
             {
-                if (partes[0].Length == 1 && int.TryParse(partes[1], out int botonInput))
+                char[] filas = { 'A', 'B', 'C', 'D', 'E', 'F' };
+                Console.WriteLine("Defina cuántos toques quiere aplicar en cada FILA (Máximo recomendado: 2 o 3):");
+                foreach (char f in filas)
+                {
+                    Console.Write($"Toques para Fila {f}: ");
+                    if (!int.TryParse(Console.ReadLine(), out int t) || t < 0) t = 0;
+                    configuracionToques.Add(t);
+                }
+            }
+            else
+            {
+                Console.WriteLine("Defina cuántos toques quiere aplicar en cada SECCIÓN:");
+                string[] secciones = { "SUPERIOR (A-B)", "CENTRAL (C-D)", "INFERIOR (E-F)" };
+                foreach (string s in secciones)
+                {
+                    Console.Write($"Toques para Sección {s}: ");
+                    if (!int.TryParse(Console.ReadLine(), out int t) || t < 0) t = 0;
+                    configuracionToques.Add(t);
+                }
+            }
+
+            Console.WriteLine("\n[MOTOR] Ejecutando ingeniería inversa y validación BFS por zonas...");
+            
+            // Llamada limpia al nuevo motor por arreglos
+            string secuenciaSolucion = juego.GenerarNivelPerfectoPorArreglo(configuracionToques, modoDificil);
+
+            if (string.IsNullOrEmpty(secuenciaSolucion))
+            {
+                Console.WriteLine("\n[ERROR] No se pudo encontrar un mapa con esa profundidad exacta. Intentá de nuevo.");
+                Console.ReadKey();
+                continue;
+            }
+
+            while (true)
+            {
+                Console.Clear();
+                Console.WriteLine("=== PROTOTIPO: INVERSIÓN ASIMÉTRICA ===");
+                Console.WriteLine($"Modo actual: {(modoDificil ? "DIFÍCIL 🔴" : "FÁCIL 🟢")}");
+                Console.WriteLine($"[TESTING] Secuencia óptima para ganar: {secuenciaSolucion}");
+                Console.WriteLine("Estados: 0 = BLANCO, 1 = NEGRO (Solo podés tocar los 1s)\n");
+
+                juego.DibujarTableroConsola();
+
+                Console.WriteLine("\nEscribí la fila (A-F) and el botón (1-6) separados por espacio (o 'rendirse').");
+                Console.Write("Tu jugada: ");
+
+                string entrada = Console.ReadLine().Trim().ToUpper();
+                if (entrada == "RENDIRSE") break;
+
+                string[] partes = entrada.Split(' ');
+                if (partes.Length == 2)
                 {
                     char filaInput = partes[0][0];
-                    
-                    // Se pasa el parámetro de dificultad a la función core
-                    bool exito = juego.PresionarBotónJugador(filaInput, botonInput - 1, modoDificil);
-                    if (!exito)
+                    if (int.TryParse(partes[1], out int botonInput))
                     {
-                        Console.WriteLine("\n[ERROR] ¡Movimiento inválido! Recordá que solo podés tocar botones NEGROS (1) dentro del rango.");
-                        Console.ReadKey();
-                    }
-                    else
-                    {
-                        if (juego.EsVictoria())
+                        bool exito = juego.PresionarBotónJugador(filaInput, botonInput - 1, modoDificil);
+                        if (!exito)
                         {
-                            Console.Clear();
-                            Console.WriteLine("=================================");
-                            Console.WriteLine(" ¡VICTORIA! ¡TABLERO LIMPIO! ");
-                            Console.WriteLine("=================================");
-                            juego.DibujarTableroConsola();
-                            Console.WriteLine("\nPresioná cualquier tecla para salir...");
+                            Console.WriteLine("\n[ERROR] Movimiento inválido. Solo podés tocar botones NEGROS (1).");
                             Console.ReadKey();
-                            break;
+                        }
+                        else
+                        {
+                            if (juego.EsVictoria())
+                            {
+                                Console.Clear();
+                                Console.WriteLine("=================================");
+                                Console.WriteLine(" ¡VICTORIA! ¡TABLERO LIMPIO! ");
+                                Console.WriteLine("=================================");
+                                juego.DibujarTableroConsola();
+                                Console.WriteLine("\nPresioná cualquier tecla para continuar...");
+                                Console.ReadKey();
+                                break;
+                            }
                         }
                     }
                 }
             }
+            
         }
     }
 }
@@ -70,24 +111,251 @@ class Program
 public class TableroLogica
 {
     private Dictionary<char, int[]> matrizTablero = new Dictionary<char, int[]>();
+    private List<char> ordenFilas = new List<char> { 'A', 'B', 'C', 'D', 'E', 'F' };
 
     public TableroLogica()
     {
-        InicializarTablero();
+        InicializarTableroLimpio();
     }
 
-    private void InicializarTablero()
+    private void InicializarTableroLimpio()
     {
-        // Tablero inicializado con algunos 1s estratégicos para probar las conexiones
-        matrizTablero['A'] = new int[] { 0, 1, 0 };
-        matrizTablero['B'] = new int[] { 1, 0, 1, 0, 1 };
-        matrizTablero['C'] = new int[] { 0, 0, 1, 1, 0, 0 };
-        matrizTablero['D'] = new int[] { 0, 1, 0, 0, 1, 0 };
-        matrizTablero['E'] = new int[] { 1, 0, 0, 0, 1 };
-        matrizTablero['F'] = new int[] { 0, 1, 0 };
+        matrizTablero['A'] = new int[] { 0, 0, 0 };
+        matrizTablero['B'] = new int[] { 0, 0, 0, 0, 0 };
+        matrizTablero['C'] = new int[] { 0, 0, 0, 0, 0, 0 };
+        matrizTablero['D'] = new int[] { 0, 0, 0, 0, 0, 0 };
+        matrizTablero['E'] = new int[] { 0, 0, 0, 0, 0 };
+        matrizTablero['F'] = new int[] { 0, 0, 0 };
     }
 
-    // SE MODIFICÓ: Ahora recibe el parámetro 'esDificil' para evaluar la vecindad vertical reciprocada
+    // FASE 1 Y 2 UNIFICADAS: La función monstrua
+    // PASO 4: El nuevo motor unificado e inteligente por barajado de estados
+    public string GenerarNivelPerfectoPorArreglo(List<int> toquesPorZona, bool esDificil)
+    {
+        string solucionTotal = "";
+        
+        if (!esDificil)
+        {
+            // === MODO FÁCIL: PROCESA LAS 6 FILAS INDEPENDIENTES ===
+            char[] filas = { 'A', 'B', 'C', 'D', 'E', 'F' };
+            int[] largosFilas = { 3, 5, 6, 6, 5, 3 };
+            int[] limitesInicio = { 0, 3, 8, 14, 20, 25 }; // Índices de inicio reales en el string
+
+            // Plantilla base de 28 ceros para ir guardando el desorden de cada fila juntas
+            char[] hashAcumuladoFacil = new string('0', 28).ToCharArray();
+
+            for (int fIdx = 0; fIdx < filas.Length; fIdx++)
+            {
+                char fila = filas[fIdx];
+                int toquesRequeridos = toquesPorZona[fIdx];
+                List<char> zonaFila = new List<char> { fila };
+                
+                if (toquesRequeridos == 0) continue;
+
+                List<int> combinacionesBarajadas = ObtenerCombinacionesBarajadas(largosFilas[fIdx]);
+                bool filaResuelta = false;
+
+                foreach (int numDecimal in combinacionesBarajadas)
+                {
+                    string hashCandidato = GenerarHashInyectado(numDecimal, false, zonaFila);
+                    string objetivoFila = new string('0', 28);
+
+                    var bsfFila = ResolverPorBFS(hashCandidato, false, zonaFila, objetivoFila);
+
+                    int pasosRealesFila = 0;
+                    if (!string.IsNullOrEmpty(bsfFila.RutaSolucion) && bsfFila.RutaSolucion != "Ya resuelto")
+                    {
+                        pasosRealesFila = bsfFila.RutaSolucion.Split(' ').Length;
+                    }
+
+                    if (pasosRealesFila == toquesRequeridos)
+                    {
+                        solucionTotal += bsfFila.RutaSolucion + " ";
+                        
+                        // CORRECCIÓN: Copiamos únicamente los bits de esta fila dentro del hash acumulado
+                        char[] candidatoChars = hashCandidato.ToCharArray();
+                        int inicio = limitesInicio[fIdx];
+                        int largo = largosFilas[fIdx];
+                        for (int i = 0; i < largo; i++)
+                        {
+                            hashAcumuladoFacil[inicio + i] = candidatoChars[inicio + i];
+                        }
+
+                        filaResuelta = true;
+                        break; 
+                    }
+                }
+
+                if (!filaResuelta)
+                {
+                    return ""; 
+                }
+            }
+
+            // AL PURO FINAL: Cargamos el tablero unificado con todas las filas juntas
+            CargarTableroDesdeHash(new string(hashAcumuladoFacil));
+            return solucionTotal.Trim();
+        }
+        else
+        {
+            // === MODO DIFÍCIL: PROCESA LAS 3 SECCIONES VERTICALES ===
+            List<char>[] zonas = {
+                new List<char> { 'A', 'B' }, // Superior (3 + 5 = 8 botones)
+                new List<char> { 'C', 'D' }, // Central (6 + 6 = 12 botones)
+                new List<char> { 'E', 'F' }  // Inferior (5 + 3 = 8 botones)
+            };
+            int[] largosZonas = { 8, 12, 8 };
+
+            // Inicializamos el tablero completo en un hash base vacío de 26 ceros
+            char[] hashAcumulado = new string('0', 28).ToCharArray();
+
+            for (int zIdx = 0; zIdx < zonas.Length; zIdx++)
+            {
+                int toquesRequeridos = toquesPorZona[zIdx];
+                List<char> zonaActual = zonas[zIdx];
+
+                if (toquesRequeridos == 0) continue;
+
+                List<int> combinacionesBarajadas = ObtenerCombinacionesBarajadas(largosZonas[zIdx]);
+                bool zonaResuelta = false;
+
+                // Determinamos los índices globales en el string para limpiar solo esta zona
+                int inicioZona = (zIdx == 0) ? 0 : (zIdx == 1) ? 8 : 20;
+                int largoZona = largosZonas[zIdx];
+
+                foreach (int numDecimal in combinacionesBarajadas)
+                {
+                    // Generamos el desorden aislado de esta zona
+                    string hashZonal = GenerarHashInyectado(numDecimal, true, zonaActual);
+                    char[] candidatosZonales = hashZonal.ToCharArray();
+
+                    // Incrustamos el caos de esta zona encima del hash acumulado del tablero entero
+                    char[] testTableroCompleto = (char[])hashAcumulado.Clone();
+                    for (int i = 0; i < largoZona; i++)
+                    {
+                        testTableroCompleto[inicioZona + i] = candidatosZonales[inicioZona + i];
+                    }
+
+                    string hashPruebaCompleto = new string(testTableroCompleto);
+
+                    // El objetivo del BFS es dejar en '0' únicamente los botones de esta zona específica
+                    char[] maskObjetivo = (char[])hashPruebaCompleto.ToCharArray();
+                    for (int i = 0; i < largoZona; i++)
+                    {
+                        maskObjetivo[inicioZona + i] = '0';
+                    }
+                    string objetivoZona = new string(maskObjetivo);
+
+                    var bsfZona = ResolverPorBFS(hashPruebaCompleto, true, zonaActual, objetivoZona);
+
+                    int pasosRealesZona = 0;
+                    if (!string.IsNullOrEmpty(bsfZona.RutaSolucion) && bsfZona.RutaSolucion != "Ya resuelto")
+                    {
+                        pasosRealesZona = bsfZona.RutaSolucion.Split(' ').Length;
+                    }
+
+                    if (pasosRealesZona == toquesRequeridos)
+                    {
+                        if (bsfZona.RutaSolucion != "Ya resuelto")
+                        {
+                            solucionTotal += bsfZona.RutaSolucion + " ";
+                        }
+                        
+                        // Guardamos este bloque caótico validado dentro del hash acumulado
+                        for (int i = 0; i < largoZona; i++)
+                        {
+                            hashAcumulado[inicioZona + i] = candidatosZonales[inicioZona + i];
+                        }
+                        
+                        zonaResuelta = true;
+                        break; 
+                    }
+                }
+
+                if (!zonaResuelta)
+                {
+                    return ""; 
+                }
+            }
+
+            // Al final cargamos el tablero unificado definitivo en la matriz para que el jugador juegue
+            CargarTableroDesdeHash(new string(hashAcumulado));
+            return solucionTotal.Trim();
+        }
+    }
+
+    private (int PasosMinimos, string RutaSolucion) ResolverPorBFS(string hashInicial, bool esDificil, List<char> filasZona, string objetivoZona)
+{
+    if (hashInicial == objetivoZona) return (0, "Ya resuelto");
+
+    Queue<(string Estado, int Profundidad, string Ruta)> cola = new Queue<(string, int, string)>();
+    HashSet<string> visitados = new HashSet<string>();
+
+    cola.Enqueue((hashInicial, 0, ""));
+    visitados.Add(hashInicial);
+
+    // --- OPTIMIZACIÓN DE ÍNDICES ---
+    // Calculamos en qué parte del string total empieza y termina la zona que estamos analizando
+    int inicioFor = 0;
+    int finFor = hashInicial.Length;
+
+    if (!esDificil && filasZona.Count == 1)
+    {
+        char filaActual = filasZona[0];
+        // Límites fijos de tus filas en el string de 26 caracteres:
+        // A=0..2, B=3..7, C=8..13, D=14..19, E=20..24, F=25..27
+        if (filaActual == 'A') { inicioFor = 0;  finFor = 3;  }
+        else if (filaActual == 'B') { inicioFor = 3;  finFor = 8;  }
+        else if (filaActual == 'C') { inicioFor = 8;  finFor = 14; }
+        else if (filaActual == 'D') { inicioFor = 14; finFor = 20; }
+        else if (filaActual == 'E') { inicioFor = 20; finFor = 25; }
+        else if (filaActual == 'F') { inicioFor = 25; finFor = 28; }
+    }
+    else if (esDificil)
+    {
+        // En modo difícil evaluamos por bloques completos de zonas
+        char filaInicio = filasZona[0];
+        if (filaInicio == 'A' || filaInicio == 'B') { inicioFor = 0;  finFor = 8;  } // Zona Superior (A-B)
+        else if (filaInicio == 'C' || filaInicio == 'D') { inicioFor = 8;  finFor = 20; } // Zona Central (C-D)
+        else if (filaInicio == 'E' || filaInicio == 'F') { inicioFor = 20; finFor = 28; } // Zona Inferior (E-F)
+    }
+
+    while (cola.Count > 0)
+    {
+        var actual = cola.Dequeue();
+
+        if (actual.Estado == objetivoZona)
+        {
+            return (actual.Profundidad, actual.Ruta.Trim());
+        }
+
+        // Aplicamos los límites optimizados en el for para que no revise todo el tablero
+        for (int i = inicioFor; i < finFor; i++)
+        {
+            if (actual.Estado[i] == '1') 
+            {
+                var (fila, indiceBoton) = TraducirIndiceStringATablero(i);
+                CargarTableroDesdeHash(actual.Estado);
+                
+                InvertirBoton(fila, indiceBoton);
+                InvertirBoton(fila, indiceBoton - 1);
+                InvertirBoton(fila, indiceBoton + 1);
+                if (esDificil) CalcularVecinosVerticales(fila, indiceBoton);
+
+                string nuevoHash = ObtenerHashTablero();
+
+                if (!visitados.Contains(nuevoHash))
+                {
+                    visitados.Add(nuevoHash);
+                    string pasoActual = $"{fila}{indiceBoton + 1}";
+                    cola.Enqueue((nuevoHash, actual.Profundidad + 1, actual.Ruta + " " + pasoActual));
+                }
+            }
+        }
+    }
+    return (-1, "");
+}
+
     public bool PresionarBotónJugador(char fila, int indiceBoton, bool esDificil)
     {
         if (!matrizTablero.ContainsKey(fila) || indiceBoton < 0 || indiceBoton >= matrizTablero[fila].Length)
@@ -96,14 +364,10 @@ public class TableroLogica
         if (matrizTablero[fila][indiceBoton] == 0)
             return false;
 
-        // 1. Invertir el botón que el jugador presionó
         InvertirBoton(fila, indiceBoton);
-
-        // 2. Vecinos Horizontales (Aplica siempre en Fácil y Difícil)
         InvertirBoton(fila, indiceBoton - 1);
         InvertirBoton(fila, indiceBoton + 1);
 
-        // 3. Vecinos Verticales (Mapeo recíproco estricto del GDD y su lista, solo en Modo Difícil)
         if (esDificil)
         {
             CalcularVecinosVerticales(fila, indiceBoton);
@@ -112,49 +376,40 @@ public class TableroLogica
         return true;
     }
 
-    // SE AGREGÓ: Función dedicada a procesar su lista de conexiones recíprocas sin redundancia
     private void CalcularVecinosVerticales(char fila, int indice)
     {
-        int botonNum = indice + 1; // Pasamos a base 1 para que calce idéntico a su lista
-
-        // ZONA SUPERIOR (Filas A y B)
+        int botonNum = indice + 1;
         if (fila == 'A')
         {
-            if (botonNum == 1) InvertirBoton('B', 1); // A1 conecta con B2 (índice 1)
-            if (botonNum == 2) InvertirBoton('B', 2); // A2 conecta con B3 (índice 2)
-            if (botonNum == 3) InvertirBoton('B', 3); // A3 conecta con B4 (índice 3)
+            if (botonNum == 1) InvertirBoton('B', 1);
+            if (botonNum == 2) InvertirBoton('B', 2);
+            if (botonNum == 3) InvertirBoton('B', 3);
         }
         else if (fila == 'B')
         {
-            if (botonNum == 2) InvertirBoton('A', 0); // B2 conecta con A1 (índice 0)
-            if (botonNum == 3) InvertirBoton('A', 1); // B3 conecta con A2 (índice 1)
-            if (botonNum == 4) InvertirBoton('A', 2); // B4 conecta con A3 (índice 2)
-            // Botones 1 y 5 son puntos ciegos (Opción A), no tienen vecinos arriba
+            if (botonNum == 2) InvertirBoton('A', 0);
+            if (botonNum == 3) InvertirBoton('A', 1);
+            if (botonNum == 4) InvertirBoton('A', 2);
         }
-
-        // ZONA CENTRAL (Filas C y D conectadas 1:1 perfectamente)
         else if (fila == 'C')
         {
-            InvertirBoton('D', indice); // C conecta directamente con su espejo abajo en D
+            InvertirBoton('D', indice);
         }
         else if (fila == 'D')
         {
-            InvertirBoton('C', indice); // D conecta directamente con su espejo arriba en C
+            InvertirBoton('C', indice);
         }
-
-        // ZONA INFERIOR (Filas E y F - Espejo de la zona superior)
         else if (fila == 'F')
         {
-            if (botonNum == 1) InvertirBoton('E', 1); // F1 conecta con E2 (índice 1)
-            if (botonNum == 2) InvertirBoton('E', 2); // F2 conecta con E3 (índice 2)
-            if (botonNum == 3) InvertirBoton('E', 3); // F3 conecta con E4 (índice 3)
+            if (botonNum == 1) InvertirBoton('E', 1);
+            if (botonNum == 2) InvertirBoton('E', 2);
+            if (botonNum == 3) InvertirBoton('E', 3);
         }
         else if (fila == 'E')
         {
-            if (botonNum == 2) InvertirBoton('F', 0); // E2 conecta con F1 (índice 0)
-            if (botonNum == 3) InvertirBoton('F', 1); // E3 conecta con F2 (índice 1)
-            if (botonNum == 4) InvertirBoton('F', 2); // E4 conecta con F3 (índice 2)
-            // Botones 1 y 5 son puntos ciegos, no tienen vecinos abajo
+            if (botonNum == 2) InvertirBoton('F', 0);
+            if (botonNum == 3) InvertirBoton('F', 1);
+            if (botonNum == 4) InvertirBoton('F', 2);
         }
     }
 
@@ -167,16 +422,48 @@ public class TableroLogica
         }
     }
 
+    private string ObtenerHashTablero()
+    {
+        StringBuilder sb = new StringBuilder();
+        foreach (char f in ordenFilas)
+        {
+            foreach (int val in matrizTablero[f]) sb.Append(val);
+        }
+        return sb.ToString();
+    }
+
+    private void CargarTableroDesdeHash(string hash)
+    {
+        int index = 0;
+        foreach (char f in ordenFilas)
+        {
+            for (int i = 0; i < matrizTablero[f].Length; i++)
+            {
+                matrizTablero[f][i] = hash[index++] - '0';
+            }
+        }
+    }
+
+    private (char Fila, int Indice) TraducirIndiceStringATablero(int stringIndex)
+    {
+        int acumulado = 0;
+        foreach (char f in ordenFilas)
+        {
+            int largo = matrizTablero[f].Length;
+            if (stringIndex < acumulado + largo)
+            {
+                return (f, stringIndex - acumulado);
+            }
+            acumulado += largo;
+        }
+        return ('A', 0);
+    }
+
     public bool EsVictoria()
     {
         foreach (var fila in matrizTablero)
         {
-            int[] arreglo = fila.Value;
-            for (int i = 0; i < arreglo.Length; i++)
-            {
-                if (arreglo[i] == 1)
-                    return false;
-            }
+            foreach (int val in fila.Value) if (val == 1) return false;
         }
         return true;
     }
@@ -185,17 +472,75 @@ public class TableroLogica
     {
         foreach (var fila in matrizTablero)
         {
-            if (fila.Key == 'A' || fila.Key == 'F') { Console.Write("    "); }
-            if (fila.Key == 'B' || fila.Key == 'E') { Console.Write("  "); }
+            if (fila.Key == 'A' || fila.Key == 'F') { Console.Write(" "); }
+            if (fila.Key == 'B' || fila.Key == 'E') { Console.Write(" "); }
             if (fila.Key == 'C' || fila.Key == 'D') { Console.Write(""); }
 
             Console.Write(fila.Key + " -> [ ");
-            int[] arreglo = fila.Value;
-            for (int i = 0; i < arreglo.Length; i++)
-            {
-                Console.Write(arreglo[i] + " ");
-            }
+            foreach (int val in fila.Value) Console.Write(val + " ");
             Console.WriteLine("]");
         }
     }
+     // PASO 2: Generar una lista de todas las combinaciones posibles barajadas al azar
+    private List<int> ObtenerCombinacionesBarajadas(int cantidadBotones)
+    {
+        // Calculamos el total de combinaciones (2 elevado a la cantidad de botones)
+        int totalCombinaciones = 1 << cantidadBotones; 
+        
+        List<int> combinaciones = new List<int>(totalCombinaciones);
+        for (int i = 0; i < totalCombinaciones; i++)
+        {
+            combinaciones.Add(i);
+        }
+
+        // Algoritmo Fisher-Yates para desordenar la lista al azar de forma ultra rápida
+        Random rand = new Random();
+        for (int i = totalCombinaciones - 1; i > 0; i--)
+        {
+            int j = rand.Next(i + 1);
+            int temp = combinaciones[i];
+            combinaciones[i] = combinaciones[j];
+            combinaciones[j] = temp;
+        }
+
+        return combinaciones;
+    }
+    // PASO 3: Convertir el número entero a binario e inyectarlo en la zona correspondiente del hash
+private string GenerarHashInyectado(int combinacionDecimal, bool esDificil, List<char> filasZona)
+{
+    // Creamos una plantilla del tablero vacío (todo ceros, 26 botones)
+    char[] baseTablero = new string('0', 28).ToCharArray();
+    
+    // Identificamos los índices de inicio y el largo según la zona/fila
+    int inicioIndex = 0;
+    int largoZona = 0;
+
+    if (!esDificil && filasZona.Count == 1)
+    {
+        char filaActual = filasZona[0];
+        if (filaActual == 'A') { inicioIndex = 0;  largoZona = 3; }
+        else if (filaActual == 'B') { inicioIndex = 3;  largoZona = 5; }
+        else if (filaActual == 'C') { inicioIndex = 8;  largoZona = 6; }
+        else if (filaActual == 'D') { inicioIndex = 14; largoZona = 6; }
+        else if (filaActual == 'E') { inicioIndex = 20; largoZona = 5; }
+        else if (filaActual == 'F') { inicioIndex = 25; largoZona = 3; }
+    }
+    else if (esDificil)
+    {
+        char filaInicio = filasZona[0];
+        if (filaInicio == 'A' || filaInicio == 'B') { inicioIndex = 0;  largoZona = 8;  } // Superior (3+5)
+        else if (filaInicio == 'C' || filaInicio == 'D') { inicioIndex = 8;  largoZona = 12; } // Central (6+6)
+        else if (filaInicio == 'E' || filaInicio == 'F') { inicioIndex = 20; largoZona = 8;  } // Inferior (5+3)
+    }
+
+    // Inyectamos el número mapeándolo bit a bit en los índices de la zona
+    for (int i = 0; i < largoZona; i++)
+    {
+        // Revisamos si el bit en la posición 'i' está encendido (es un 1)
+        int bit = (combinacionDecimal >> i) & 1;
+        baseTablero[inicioIndex + i] = (bit == 1) ? '1' : '0';
+    }
+
+    return new string(baseTablero);
+}
 }
