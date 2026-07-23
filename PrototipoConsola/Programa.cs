@@ -2,6 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+[System.Serializable]
+public struct NivelConfig
+{
+    public int NumeroNivel;
+    public bool EsDificil;
+    public string HashInicial;      // El string de 28 unos y ceros fijo
+    public int MovimientosMaximos;  // Límite de toques del jugador
+    public string RutaSolucion;     // La solución óptima ("A1 B3") por si las pistas
+}
+
 class Program
 {
     static void Main(string[] args)
@@ -286,13 +296,18 @@ public class TableroLogica
 
     private (int PasosMinimos, string RutaSolucion) ResolverPorBFS(string hashInicial, bool esDificil, List<char> filasZona, string objetivoZona)
 {
-    if (hashInicial == objetivoZona) return (0, "Ya resuelto");
+    int intInicial = ConvertirHashAEntero(hashInicial);
+    int intObjetivo = ConvertirHashAEntero(objetivoZona);
 
-    Queue<(string Estado, int Profundidad, string Ruta)> cola = new Queue<(string, int, string)>();
-    HashSet<string> visitados = new HashSet<string>();
+    if (intInicial == intObjetivo) return (0, "Ya resuelto");
 
-    cola.Enqueue((hashInicial, 0, ""));
-    visitados.Add(hashInicial);
+    // 2. Cambiamos <string> por <int> en la cola y en el HashSet
+    Queue<(int Estado, int Profundidad, string Ruta)> cola = new Queue<(int, int, string)>();
+    HashSet<int> visitados = new HashSet<int>();
+
+    // 3. Metemos el número inicial a la cola y a los visitados
+    cola.Enqueue((intInicial, 0, ""));
+    visitados.Add(intInicial);
 
     // --- OPTIMIZACIÓN DE ÍNDICES ---
     // Calculamos en qué parte del string total empieza y termina la zona que estamos analizando
@@ -320,35 +335,42 @@ public class TableroLogica
         else if (filaInicio == 'E' || filaInicio == 'F') { inicioFor = 20; finFor = 28; } // Zona Inferior (E-F)
     }
 
-    while (cola.Count > 0)
+     while (cola.Count > 0)
     {
         var actual = cola.Dequeue();
 
-        if (actual.Estado == objetivoZona)
+        // 1. Validación numérica directa
+        if (actual.Estado == intObjetivo)
         {
             return (actual.Profundidad, actual.Ruta.Trim());
         }
 
-        // Aplicamos los límites optimizados en el for para que no revise todo el tablero
+        // 2. Traducimos una sola vez para usar sus funciones de strings
+        string estadoString = ConvertirEnteroAHash(actual.Estado);
+
         for (int i = inicioFor; i < finFor; i++)
         {
-            if (actual.Estado[i] == '1') 
+            if (estadoString[i] == '1')
             {
                 var (fila, indiceBoton) = TraducirIndiceStringATablero(i);
-                CargarTableroDesdeHash(actual.Estado);
+                
+                CargarTableroDesdeHash(estadoString);
                 
                 InvertirBoton(fila, indiceBoton);
                 InvertirBoton(fila, indiceBoton - 1);
                 InvertirBoton(fila, indiceBoton + 1);
                 if (esDificil) CalcularVecinosVerticales(fila, indiceBoton);
-
+                
                 string nuevoHash = ObtenerHashTablero();
+                
+                // 3. Convertimos a entero para el HashSet numérico
+                int nuevoHashInt = ConvertirHashAEntero(nuevoHash);
 
-                if (!visitados.Contains(nuevoHash))
+                if (!visitados.Contains(nuevoHashInt))
                 {
-                    visitados.Add(nuevoHash);
+                    visitados.Add(nuevoHashInt);
                     string pasoActual = $"{fila}{indiceBoton + 1}";
-                    cola.Enqueue((nuevoHash, actual.Profundidad + 1, actual.Ruta + " " + pasoActual));
+                    cola.Enqueue((nuevoHashInt, actual.Profundidad + 1, actual.Ruta + " " + pasoActual));
                 }
             }
         }
@@ -542,5 +564,29 @@ private string GenerarHashInyectado(int combinacionDecimal, bool esDificil, List
     }
 
     return new string(baseTablero);
+}
+// PASO 1: Convierte el string de unos y ceros a un entero (Bitmask)
+private int ConvertirHashAEntero(string hash)
+{
+    int bitmask = 0;
+    for (int i = 0; i < hash.Length; i++)
+    {
+        if (hash[i] == '1')
+        {
+            bitmask |= (1 << i); // Enciende el bit en la posición 'i'
+        }
+    }
+    return bitmask;
+}
+// PASO 2: Convierte un entero (Bitmask) de vuelta a un string de 28 caracteres
+private string ConvertirEnteroAHash(int bitmask)
+{
+    char[] caracteres = new char[28];
+    for (int i = 0; i < 28; i++)
+    {
+        // Revisa si el bit 'i' está encendido
+        caracteres[i] = ((bitmask & (1 << i)) != 0) ? '1' : '0';
+    }
+    return new string(caracteres);
 }
 }
